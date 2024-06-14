@@ -1,0 +1,24 @@
+{
+  "name": "waze-alert-db",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "node index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Cxmrykk/Waze-Alert-DB.git"
+  },
+  "author": "Cxmrykk",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Cxmrykk/Waze-Alert-DB/issues"
+  },
+  "homepage": "https://github.com/Cxmrykk/Waze-Alert-DB#readme",
+  "dependencies": {
+    "@dotenvx/dotenvx": "^0.44.1",
+    "axios": "^1.7.2",
+    "better-sqlite3": "^11.0.0"
+  }
+}
