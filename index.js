@@ -16,8 +16,8 @@ const Defaults = {
     "AREA_BOTTOM": "-43.633",
     "AREA_LEFT": "113.15",
     "AREA_RIGHT": "153.633",
-    "QUERY_COOLDOWN": 300,
-    "QUERY_DELAY": 1000,
+    "QUERY_COOLDOWN": 600,
+    "QUERY_DELAY": 0,
 }
 
 function UseDefault(key) {
