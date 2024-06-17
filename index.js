@@ -35,14 +35,14 @@ function ParseFloat(value) {
 }
 
 const Config = {
-    "DB_PATH": process.env.DB_PATH || UseDefault["DB_PATH"],
-    "MAX_ALERTS": process.env.MAX_ALERTS || UseDefault["MAX_ALERTS"],
-    "AREA_TOP": ParseFloat(process.env.AREA_TOP || UseDefault["AREA_TOP"]),
-    "AREA_BOTTOM": ParseFloat(process.env.AREA_BOTTOM || UseDefault["AREA_BOTTOM"]),
-    "AREA_LEFT": ParseFloat(process.env.AREA_LEFT || UseDefault["AREA_LEFT"]),
-    "AREA_RIGHT": ParseFloat(process.env.AREA_RIGHT || UseDefault["AREA_RIGHT"]),
-    "QUERY_COOLDOWN": process.env.QUERY_COOLDOWN || UseDefault["QUERY_COOLDOWN"],
-    "QUERY_DELAY": process.env.QUERY_DELAY || UseDefault["QUERY_DELAY"],
+    "DB_PATH": process.env.DB_PATH || UseDefault("DB_PATH"),
+    "MAX_ALERTS": process.env.MAX_ALERTS || UseDefault("MAX_ALERTS"),
+    "AREA_TOP": ParseFloat(process.env.AREA_TOP || UseDefault("AREA_TOP")),
+    "AREA_BOTTOM": ParseFloat(process.env.AREA_BOTTOM || UseDefault("AREA_BOTTOM")),
+    "AREA_LEFT": ParseFloat(process.env.AREA_LEFT || UseDefault("AREA_LEFT")),
+    "AREA_RIGHT": ParseFloat(process.env.AREA_RIGHT || UseDefault("AREA_RIGHT")),
+    "QUERY_COOLDOWN": process.env.QUERY_COOLDOWN || UseDefault("QUERY_COOLDOWN"),
+    "QUERY_DELAY": process.env.QUERY_DELAY || UseDefault("QUERY_DELAY"),
 }
 
 function Area(top, bottom, left, right) {
@@ -85,10 +85,6 @@ function getFormattedDate() {
     return `[${day}/${month}/${year} - ${hours}:${minutes}:${seconds}]`
 }
 
-function print(string) {
-    process.stdout.write(string)
-}
-
 function println(string) {
     console.info(`${getFormattedDate()} ${string}`)
 }
@@ -98,6 +94,15 @@ function println(string) {
 */
 async function getData(top, bottom, left, right) {
     const response = await axios.get(`https://www.waze.com/live-map/api/georss?top=${top}&bottom=${bottom}&left=${left}&right=${right}&env=row&types=alerts`)
+        .catch(reason => {
+            console.error(`ERROR: Axios get request failed with reason '${reason}'`)
+            return null
+        })
+
+    if (response === null) {
+        return null
+    }
+
     return response.data
 }
 
@@ -166,6 +171,8 @@ async function main() {
     let after = 0
 
     while (true) {
+        before = new Date().getTime()
+
         queue.push(
             {
                 top: Config["AREA_TOP"],
@@ -176,10 +183,13 @@ async function main() {
         )
 
         while (queue.length > 0) {
-            before = new Date().getTime()
-
             const { top, bottom, left, right } = queue.pop()
             const data = await getData(top, bottom, left, right)
+
+            if (data === null) {
+                println(`Skipping Queue #${queue.length} (request error)`)
+                continue
+            }
 
             println(`Processing Queue #${queue.length}. (Area estimate: ${Math.round(estimateArea(top, bottom, left, right))} km)`)
 
@@ -216,7 +226,7 @@ async function main() {
         let cooldown = (Config["QUERY_COOLDOWN"] * 1000) - (after - before)
         
         if (cooldown > 0) {
-            println(`Finished sending requests. Waiting for ${cooldown}ms before sending the next request`)
+            println(`Finished sending requests. Waiting for ${Math.round(cooldown / 1000)} seconds before sending the next request`)
             await new Promise(resolve => setTimeout(resolve, cooldown))
         } else {
             println("Finished sending requests, immediately resuming operation (cooldown has already passed).")
