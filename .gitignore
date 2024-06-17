@@ -134,3 +134,4 @@ dist
 
 # Cache
 cache/**
+!cache/.gitignore
