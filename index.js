@@ -16,10 +16,12 @@ const Defaults = {
     "AREA_BOTTOM": "-43.633",
     "AREA_LEFT": "113.15",
     "AREA_RIGHT": "153.633",
+    "QUERY_COOLDOWN": 300,
+    "QUERY_DELAY": 1000,
 }
 
 function UseDefault(key) {
-    console.warn(`Environment variable '${key}' not found, using default`)
+    console.warn(`WARNING: Environment variable '${key}' not found, using default`)
     return Defaults[key]
 }
 
@@ -39,6 +41,8 @@ const Config = {
     "AREA_BOTTOM": ParseFloat(process.env.AREA_BOTTOM || UseDefault["AREA_BOTTOM"]),
     "AREA_LEFT": ParseFloat(process.env.AREA_LEFT || UseDefault["AREA_LEFT"]),
     "AREA_RIGHT": ParseFloat(process.env.AREA_RIGHT || UseDefault["AREA_RIGHT"]),
+    "QUERY_COOLDOWN": process.env.QUERY_COOLDOWN || UseDefault["QUERY_COOLDOWN"],
+    "QUERY_DELAY": process.env.QUERY_DELAY || UseDefault["QUERY_DELAY"],
 }
 
 function Area(top, bottom, left, right) {
@@ -64,6 +68,30 @@ db.exec(`
       longitude REAL
     )
 `)
+
+/*
+    Logger helper functions
+*/
+
+function getFormattedDate() {
+    const now = new Date()
+    const day = String(now.getDate()).padStart(2, '0')
+    const month = String(now.getMonth() + 1).padStart(2, '0')
+    const year = now.getFullYear()
+    const hours = String(now.getHours()).padStart(2, '0')
+    const minutes = String(now.getMinutes()).padStart(2, '0')
+    const seconds = String(now.getSeconds()).padStart(2, '0')
+  
+    return `[${day}/${month}/${year} - ${hours}:${minutes}:${seconds}]`
+}
+
+function print(string) {
+    process.stdout.write(string)
+}
+
+function println(string) {
+    console.info(`${getFormattedDate()} ${string}`)
+}
 
 /*
     Send HTTP get request to Waze LiveMap API
@@ -110,47 +138,90 @@ function useData(data) {
     }
 }
 
+function estimateArea(top, bottom, left, right) {  
+    // Earth's radius in kilometers
+    const earthRadiusKm = 6371
+
+    // Convert latitude and longitude from degrees to radians
+    const topRad = (Math.PI / 180) * top
+    const bottomRad = (Math.PI / 180) * bottom
+    const leftRad = (Math.PI / 180) * left
+    const rightRad = (Math.PI / 180) * right
+
+    // Calculate the height and width of the area in radians
+    const height = Math.abs(topRad - bottomRad)
+    const width = Math.abs(rightRad - leftRad)
+
+    // Calculate the area using the spherical law of cosines
+    const area = (earthRadiusKm ** 2) * height * width
+
+    return area
+}
+
 /*
     Infinite loop; main thread
 */
 async function main() {
-    while (queue.length > 0) {
-        const { top, bottom, left, right } = queue.pop()
-        const data = await getData(top, bottom, left, right)
+    let before = 0
+    let after = 0
 
-        console.info(`Queue length: ${queue.length}. Data retrieved for latitude ${top} - ${bottom}, longitude ${left} - ${right}`)
+    while (true) {
+        queue.push(
+            {
+                top: Config["AREA_TOP"],
+                bottom: Config["AREA_BOTTOM"],
+                left: Config["AREA_LEFT"],
+                right: Config["AREA_RIGHT"]
+            }
+        )
 
-        // Error object found
-        if (data.error !== undefined) {
-            console.warn(`Waze LiveMap API Error: '${data.error}'`)
-            continue
+        while (queue.length > 0) {
+            before = new Date().getUTCMilliseconds()
+
+            const { top, bottom, left, right } = queue.pop()
+            const data = await getData(top, bottom, left, right)
+
+            println(`Processing Queue #${queue.length}. (Area estimate: ${Math.round(estimateArea(top, bottom, left, right))} km)`)
+
+            // Error object found
+            if (data.error !== undefined) {
+                console.error(`ERROR: Waze LiveMap API Error: '${data.error}'`)
+                continue
+            }
+
+            // No alerts object defined (empty response)
+            if (data.alerts === undefined) {
+                println("No 'alerts' key in json data response (empty response)")
+                continue
+            }
+
+            // Too many alerts displayed at once
+            if (data.alerts.length >= Config["MAX_ALERTS"]) {
+                println(`Maximum alerts reached, adding split chunks to queue.`)
+                queue.push(...splitData(top, bottom, left, right))
+            } else {
+                println(`Found ${data.alerts.length} alerts.`)
+                useData(data)
+            }
+
+            // delay the next query
+            if (Config["QUERY_DELAY"] > 0) {
+                await new Promise(resolve => setTimeout(resolve, Config["QUERY_DELAY"]))
+            }
         }
 
-        // No alerts object defined
-        if (data.alerts === undefined) {
-            console.warn("No 'alerts' key in json data response")
-            continue
-        }
+        // wait for the rest of the cooldown
+        after = new Date().getUTCMilliseconds()
 
-        // Too many alerts displayed at once
-        if (data.alerts.length >= Config["MAX_ALERTS"]) {
-            queue.push(...splitData(top, bottom, left, right))
+        let cooldown = (Config["QUERY_COOLDOWN"] * 1000) - (after - before)
+        
+        if (cooldown > 0) {
+            println(`Finished sending requests. Waiting for ${cooldown}ms before sending the next request`)
+            await new Promise(resolve => setTimeout(resolve, cooldown))
         } else {
-            useData(data)
+            println("Finished sending requests, immediately resuming operation (cooldown has already passed).")
         }
     }
 }
-
-/*
-    Start the program with default area
-*/
-queue.push(
-    {
-        top: Config["AREA_TOP"],
-        bottom: Config["AREA_BOTTOM"],
-        left: Config["AREA_LEFT"],
-        right: Config["AREA_RIGHT"]
-    }
-)
 
 main()
