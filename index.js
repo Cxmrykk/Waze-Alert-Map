@@ -176,7 +176,7 @@ async function main() {
         )
 
         while (queue.length > 0) {
-            before = new Date().getUTCMilliseconds()
+            before = new Date().getTime()
 
             const { top, bottom, left, right } = queue.pop()
             const data = await getData(top, bottom, left, right)
@@ -211,7 +211,7 @@ async function main() {
         }
 
         // wait for the rest of the cooldown
-        after = new Date().getUTCMilliseconds()
+        after = new Date().getTime()
 
         let cooldown = (Config["QUERY_COOLDOWN"] * 1000) - (after - before)
         
