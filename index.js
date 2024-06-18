@@ -1,49 +1,16 @@
-
-require('@dotenvx/dotenvx').config({
-    logLevel: "error"
-})
+const Config = require("./helper/export-env")(
+    "DB_PATH",
+    "MAX_ALERTS",
+    "AREA_TOP",
+    "AREA_BOTTOM",
+    "AREA_LEFT",
+    "AREA_RIGHT",
+    "QUERY_COOLDOWN",
+    "QUERY_DELAY",
+)
 
 const Database = require('better-sqlite3')
 const axios = require("axios")
-
-/*
-    Default .env values and warning handler
-*/
-const Defaults = {
-    "DB_PATH": "./cache/database.db",
-    "MAX_ALERTS": 200,
-    "AREA_TOP": "-10.683",
-    "AREA_BOTTOM": "-43.633",
-    "AREA_LEFT": "113.15",
-    "AREA_RIGHT": "153.633",
-    "QUERY_COOLDOWN": 600,
-    "QUERY_DELAY": 0,
-}
-
-function UseDefault(key) {
-    console.warn(`WARNING: Environment variable '${key}' not found, using default`)
-    return Defaults[key]
-}
-
-function ParseFloat(value) {
-    if (parseFloat(value) === NaN) {
-        console.error(`ERROR: Invalid float value in .env configuration (Expected float, found something else)`)
-        process.exit(1)
-    }
-
-    return parseFloat(value)
-}
-
-const Config = {
-    "DB_PATH": process.env.DB_PATH || UseDefault("DB_PATH"),
-    "MAX_ALERTS": process.env.MAX_ALERTS || UseDefault("MAX_ALERTS"),
-    "AREA_TOP": ParseFloat(process.env.AREA_TOP || UseDefault("AREA_TOP")),
-    "AREA_BOTTOM": ParseFloat(process.env.AREA_BOTTOM || UseDefault("AREA_BOTTOM")),
-    "AREA_LEFT": ParseFloat(process.env.AREA_LEFT || UseDefault("AREA_LEFT")),
-    "AREA_RIGHT": ParseFloat(process.env.AREA_RIGHT || UseDefault("AREA_RIGHT")),
-    "QUERY_COOLDOWN": process.env.QUERY_COOLDOWN || UseDefault("QUERY_COOLDOWN"),
-    "QUERY_DELAY": process.env.QUERY_DELAY || UseDefault("QUERY_DELAY"),
-}
 
 function Area(top, bottom, left, right) {
     this.top = top,
