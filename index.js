@@ -9,6 +9,7 @@ const Config = require("./helper/export-env")(
     "QUERY_DELAY",
 )
 
+const Alerts = require("./alert-types.json")
 const Database = require('better-sqlite3')
 const axios = require("axios")
 
@@ -29,7 +30,7 @@ db.pragma('journal_mode = WAL')
 db.exec(`
     CREATE TABLE IF NOT EXISTS data (
       uuid TEXT PRIMARY KEY,
-      type TEXT,
+      type INTEGER,
       pubMillis INTEGER,
       latitude REAL,
       longitude REAL
@@ -102,7 +103,7 @@ function useData(data) {
         // Insert the data into the table
         insert.run(
             alert.uuid,
-            alert.type,
+            alert.subtype === "" ? Alerts["types"][alert.type] : Alerts["subtypes"][alert.subtype],
             alert.pubMillis,
             alert.location.y,
             alert.location.x
@@ -138,6 +139,7 @@ async function main() {
     let after = 0
 
     while (true) {
+        let counter = 0
         before = new Date().getTime()
 
         queue.push(
@@ -150,6 +152,8 @@ async function main() {
         )
 
         while (queue.length > 0) {
+            counter++
+
             const { top, bottom, left, right } = queue.pop()
             const data = await getData(top, bottom, left, right)
 
@@ -158,7 +162,7 @@ async function main() {
                 continue
             }
 
-            println(`Processing Queue #${queue.length}. (Area estimate: ${Math.round(estimateArea(top, bottom, left, right))} km)`)
+            println(`Iteration #${counter} - Processing Queue #${queue.length} (Area estimate: ${Math.round(estimateArea(top, bottom, left, right))} km)`)
 
             // Error object found
             if (data.error !== undefined) {
