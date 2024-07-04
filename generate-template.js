@@ -96,13 +96,13 @@ function displayFiltersHTML() {
   return Object.entries(Alerts.types).map(([type, index]) => `
   <div>
     <span style="user-select: none;">
-      <input type="checkbox" id="${Alerts.display[index]}" name="alertType" value="${Alerts.display[index]}" checked onclick="toggleSubtypeVisibility('${Alerts.display[index]}')">
+      <input type="checkbox" id="${Alerts.display[index]}" name="alertType" value="${Alerts.display[index]}" checked onclick="updateAlertFilter()">
       <label for="${Alerts.display[index]}">${Alerts.display[index]}</label>
     </span>
     <div id="${Alerts.display[index]}-subtypes" style="margin-left: 2em;">
       ${getChildrenIterable(index).map(subIndex => `
         <span style="user-select: none;">
-          <input type="checkbox" id="${Alerts.display[subIndex]}" name="alertType" value="${Alerts.display[subIndex]}" checked>
+          <input type="checkbox" id="${Alerts.display[subIndex]}" name="alertType" value="${Alerts.display[subIndex]}" checked onclick="updateAlertFilter()">
           <label for="${Alerts.display[subIndex]}">${Alerts.display[subIndex]}</label><br>
         </span>
       `).join('')}
@@ -179,7 +179,7 @@ body { margin: 0; padding: 0; }
       cluster: true, // Enable clustering
       clusterMaxZoom: 15, // Max zoom to cluster points on
       clusterMinPoints: 20, // Minimum points to cluster
-      clusterRadius: 50 // Radius of each cluster when clustering points (defaults to 50)
+      clusterRadius: 40 // Radius of each cluster when clustering points (defaults to 50)
     });
 
     // Add a circle layer for clusters
@@ -316,11 +316,8 @@ body { margin: 0; padding: 0; }
       return; 
     }
 
-    const bounds = map.getBounds();
     const visibleFeatures = alertData.features.filter(feature => {
-      const isTypeVisible = selectedTypes.includes(feature.properties.display);
-      const isWithinBounds = bounds.contains([feature.geometry.coordinates[0], feature.geometry.coordinates[1]]);
-      return isTypeVisible && isWithinBounds;
+      return selectedTypes.includes(feature.properties.display);
     });
 
     // Update the map source with filtered data
@@ -349,11 +346,6 @@ body { margin: 0; padding: 0; }
       updateAlertFilter();
     }
   }
-
-  // Update data on map move
-  map.on('moveend', () => {
-    updateAlertFilter();
-  });
 </script>
 </body>
 </html>
