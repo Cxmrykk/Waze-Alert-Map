@@ -157,83 +157,77 @@ body { margin: 0; padding: 0; }
   const alertColours = ${JSON.stringify(alertColours)};
 
   // Fetch GeoJSON data and store it globally
-  let alertData = null; 
-  let alertFeatures = null;
+  let alertData = null;
 
   fetch('./geojson.json')
     .then(response => response.json())
     .then(data => {
-      alertData = data.features.map(feature => ({
-        latitude: feature.geometry.coordinates[1],
-        longitude: feature.geometry.coordinates[0],
-        type: feature.properties.type,
-        pubMillis: feature.properties.pubMillis,
-        display: feature.properties.display
-      }));
-      alertFeatures = data.features;
-
-      // Fetch sorted data
-      fetch('./sorted.json')
-        .then(response => response.json())
-        .then(sortedData => {
-          // Store sorted indices globally
-          window.sortedData = sortedData;
-
-          // Now that both alertData and sortedData are loaded, add the source and layers
-          addMapLayers();
-
-          // Now that the layers are added, update the filter
-          updateAlertFilter();
-        });
+      alertData = data;
+      addMapLayers();
+      updateAlertFilter(); 
     });
 
   // Function to add the map source and layers
   function addMapLayers() {
-    // Add the GeoJSON source
+    // Add a clustered GeoJSON source
     map.addSource('alerts', {
       type: 'geojson',
       data: {
         "type": "FeatureCollection",
         "features": [] // Initially empty, will be populated by filterAlertsByBounds
+      },
+      cluster: true, // Enable clustering
+      clusterMaxZoom: 15, // Max zoom to cluster points on
+      clusterMinPoints: 20, // Minimum points to cluster
+      clusterRadius: 50 // Radius of each cluster when clustering points (defaults to 50)
+    });
+
+    // Add a circle layer for clusters
+    map.addLayer({
+      id: 'clusters',
+      type: 'circle',
+      source: 'alerts',
+      filter: ['has', 'point_count'],
+      paint: {
+        // Use step expressions to make the circle bigger as the cluster size increases
+        'circle-color': [
+          'interpolate',
+          ['linear'],
+          ['get', 'point_count'],
+          20, '#e6cc00',
+          100, '#c61a09'
+        ],
+        'circle-radius': [
+          'step',
+          ['get', 'point_count'],
+          20,
+          20,
+          25,
+          100,
+          30
+        ]
       }
     });
 
-    // Add a heatmap layer
+    // Add a symbol layer for cluster counts
     map.addLayer({
-      id: 'alerts-heat',
-      type: 'heatmap',
+      id: 'cluster-count',
+      type: 'symbol',
       source: 'alerts',
-      maxzoom: 9,
-      paint: {
-        'heatmap-weight': ['get', 'mag'],
-        'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 0, 1, 9, 3],
-        'heatmap-color': [
-          'interpolate',
-          ['linear'],
-          ['heatmap-density'],
-          0,
-          'rgba(33,102,172,0)',
-          0.2,
-          'rgb(103,169,207)',
-          0.4,
-          'rgb(209,229,240)',
-          0.6,
-          'rgb(253,219,199)',
-          0.8,
-          'rgb(239,138,98)',
-          1,
-          'rgb(178,24,43)'
-        ],
-        'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 0, 2, 9, 20],
-        'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 7, 1, 9, 0]
+      filter: ['has', 'point_count'],
+      layout: {
+        'text-field': ['get', 'point_count_abbreviated'],
+        'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+        'text-size': 12
       }
-    }, 'waterway-label');
+    });
 
     // Add a circle layer for individual alerts
     map.addLayer({
-      id: 'alerts-point',
+      id: 'unclustered-point',
       type: 'circle',
       source: 'alerts',
+      filter: ['!', ['has', 'point_count']],
       minzoom: 7,
       paint: {
         'circle-radius': ['interpolate', ['linear'], ['zoom'], 7, 1, 16, 5],
@@ -248,6 +242,27 @@ body { margin: 0; padding: 0; }
         'circle-opacity': ['interpolate', ['linear'], ['zoom'], 7, 0, 8, 1]
       }
     }, 'waterway-label');
+
+    // Inspect a cluster on click
+    map.on('click', 'clusters', (e) => {
+      const features = map.queryRenderedFeatures(e.point, {
+        layers: ['clusters']
+      });
+      const clusterId = features[0].properties.cluster_id;
+      const source = map.getSource('alerts');
+
+      source.getClusterExpansionZoom(
+        clusterId,
+        (err, zoom) => {
+          if (err) return;
+
+          map.easeTo({
+            center: features[0].geometry.coordinates,
+            zoom: zoom
+          });
+        }
+      );
+    });
   }
 
   // Event listener for checkbox changes
@@ -266,8 +281,8 @@ body { margin: 0; padding: 0; }
   });
 
   checkboxes.forEach(checkbox => {
-    const checkboxContainer = checkbox.parentElement; // Get the parent <span>
-    checkboxContainer.addEventListener('mouseover', () => { // Use mouseover
+    const checkboxContainer = checkbox.parentElement;
+    checkboxContainer.addEventListener('mouseover', () => {
       if (isMouseDown) {
         if (!hasChecked) {
           isFirstChecked = checkbox.checked;
@@ -277,7 +292,7 @@ body { margin: 0; padding: 0; }
         if (checkbox.checked === isFirstChecked) {
           checkbox.checked = !isFirstChecked
         }
-        
+
         updateAlertFilter();
       }
     });
@@ -297,62 +312,22 @@ body { margin: 0; padding: 0; }
 
   // Function to filter alerts by bounds and selected types
   function filterAlertsByBounds(selectedTypes) {
-    if (!alertData || !window.sortedData || !map.getSource('alerts')) {
-      // Data or source not loaded yet, do nothing
+    if (!alertData || !map.getSource('alerts')) {
       return; 
     }
 
     const bounds = map.getBounds();
-    const visibleFeatures = [];
-
-    // Binary search for latitude bounds
-    const latStart = binarySearchIndex(window.sortedData.latitude, bounds._sw.lat, 'latitude');
-    const latEnd = binarySearchIndex(window.sortedData.latitude, bounds._ne.lat, 'latitude', false);
-
-    // Iterate through latitude-filtered indices
-    for (let i = latStart; i <= latEnd; i++) {
-      const alertIndex = window.sortedData.latitude[i];
-      const alert = alertData[alertIndex];
-
-      // Check if longitude is within bounds
-      if (alert.longitude >= bounds._sw.lng && alert.longitude <= bounds._ne.lng && selectedTypes.includes(alert.display)) {
-        visibleFeatures.push(alertFeatures[alertIndex]);
-      }
-    }
+    const visibleFeatures = alertData.features.filter(feature => {
+      const isTypeVisible = selectedTypes.includes(feature.properties.display);
+      const isWithinBounds = bounds.contains([feature.geometry.coordinates[0], feature.geometry.coordinates[1]]);
+      return isTypeVisible && isWithinBounds;
+    });
 
     // Update the map source with filtered data
     map.getSource('alerts').setData({
       "type": "FeatureCollection",
       "features": visibleFeatures
     });
-  }
-
-  // Binary search helper function
-  function binarySearchIndex(arr, target, property, findFirst = true) {
-    let low = 0;
-    let high = arr.length - 1;
-    let result = -1;
-
-    while (low <= high) {
-      const mid = Math.floor((low + high) / 2);
-      const value = alertData[arr[mid]][property];
-
-      if (value === target) {
-        return mid;
-      } else if (value < target) {
-        low = mid + 1;
-        if (!findFirst) {
-          result = mid; // Keep track of last index less than target
-        }
-      } else {
-        high = mid - 1;
-        if (findFirst) {
-          result = mid; // Keep track of first index greater than target
-        }
-      }
-    }
-
-    return result;
   }
 
   // Function to toggle subtype visibility
@@ -375,15 +350,11 @@ body { margin: 0; padding: 0; }
     }
   }
 
-  // Initial filtering on load (will be called after data is loaded)
-  // updateAlertFilter();
-
   // Update data on map move
   map.on('moveend', () => {
     updateAlertFilter();
   });
 </script>
-
 </body>
 </html>
 `;
