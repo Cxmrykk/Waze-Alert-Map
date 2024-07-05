@@ -32,6 +32,7 @@ const alertFeatures = alertData.map(alert => ({
     "type": alert.type,
     "pubMillis": alert.pubMillis,
     "display": Alerts["display"][alert.type],
+    "parentType": getParentType(alert.type) // Add parent type information
   }
 }))
 
@@ -92,14 +93,24 @@ function getChildrenIterable(index) {
   return arr
 }
 
+// Function to get the parent type of a subtype
+function getParentType(subtype) {
+  for (const [parentType, range] of Object.entries(Alerts.children)) {
+    if (subtype >= range[0] && subtype <= range[1]) {
+      return Alerts.display[parentType];
+    }
+  }
+  return null; // Or handle cases where a parent type might not be found
+}
+
 function displayFiltersHTML() {
   return Object.entries(Alerts.types).map(([type, index]) => `
-  <div>
-    <span style="user-select: none;">
-      <input type="checkbox" id="${Alerts.display[index]}" name="alertType" value="${Alerts.display[index]}" checked onclick="updateAlertFilter()">
-      <label for="${Alerts.display[index]}">${Alerts.display[index]}</label>
-    </span>
-    <div id="${Alerts.display[index]}-subtypes" style="margin-left: 2em;">
+    <div id="${Alerts.display[index]}-container" style="display:none;">
+      <h3>${Alerts.display[index]}</h3>
+      <span style="user-select: none;">
+        <input type="checkbox" id="${Alerts.display[index]}" name="alertType" value="${Alerts.display[index]}" checked onclick="updateAlertFilter()"> 
+        <label for="${Alerts.display[index]}">${Alerts.display[index]} (All)</label><br> 
+      </span>
       ${getChildrenIterable(index).map(subIndex => `
         <span style="user-select: none;">
           <input type="checkbox" id="${Alerts.display[subIndex]}" name="alertType" value="${Alerts.display[subIndex]}" checked onclick="updateAlertFilter()">
@@ -107,8 +118,7 @@ function displayFiltersHTML() {
         </span>
       `).join('')}
     </div>
-  </div>
-`).join('')
+  `).join('')
 }
 
 // Generate HTML content
@@ -137,8 +147,15 @@ body { margin: 0; padding: 0; }
 <body>
 <div id="map"></div>
 <div id="controls">
-  <h3>Display Filter</h3>
-  ${displayFiltersHTML()}
+  <h3>Select Alert Type</h3>
+  <select id="alertTypeSelect" onchange="updateSubtypeVisibility()">
+    ${Object.entries(Alerts.types).map(([type, index]) => `
+      <option value="${Alerts.display[index]}">${Alerts.display[index]}</option>
+    `).join('')}
+  </select>
+  <div id="subtype-filters">
+    ${displayFiltersHTML()}
+  </div>
 </div>
 
 <script>
@@ -317,7 +334,8 @@ body { margin: 0; padding: 0; }
     }
 
     const visibleFeatures = alertData.features.filter(feature => {
-      return selectedTypes.includes(feature.properties.display);
+      return selectedTypes.includes(feature.properties.display) ||
+             selectedTypes.includes(feature.properties.parentType); // Include if parent type is selected
     });
 
     // Update the map source with filtered data
@@ -327,24 +345,24 @@ body { margin: 0; padding: 0; }
     });
   }
 
-  // Function to toggle subtype visibility
-  function toggleSubtypeVisibility(parentType) {
-    const subtypeContainer = document.getElementById(parentType + "-subtypes");
-    const parentCheckbox = document.getElementById(parentType);
+  // Function to toggle subtype visibility based on selected parent type
+  function updateSubtypeVisibility() {
+    const selectedType = document.getElementById('alertTypeSelect').value;
 
-    if (subtypeContainer && parentCheckbox) {
-      subtypeContainer.style.display = parentCheckbox.checked ? 'block' : 'none';
+    // Hide all subtype containers
+    const subtypeContainers = document.querySelectorAll('div[id$="-container"]');
+    subtypeContainers.forEach(container => {
+      container.style.display = 'none';
+    });
 
-      // Uncheck all subtypes when parent is unchecked
-      if (!parentCheckbox.checked) {
-        subtypeContainer.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
-          checkbox.checked = false;
-        });
-      }
-
-      // Update the filter after toggling visibility
-      updateAlertFilter();
+    // Show the selected subtype container
+    const selectedContainer = document.getElementById(selectedType + '-container');
+    if (selectedContainer) {
+      selectedContainer.style.display = 'block';
     }
+
+    // Update the filter to reflect the change in visible subtypes
+    updateAlertFilter();
   }
 </script>
 </body>
