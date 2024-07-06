@@ -344,26 +344,45 @@ body { margin: 0; padding: 0; }
       "features": visibleFeatures
     });
   }
+    
+// Function to toggle subtype visibility based on selected parent type
+function updateSubtypeVisibility() {
+  const selectedType = document.getElementById('alertTypeSelect').value;
 
-  // Function to toggle subtype visibility based on selected parent type
-  function updateSubtypeVisibility() {
-    const selectedType = document.getElementById('alertTypeSelect').value;
+  // Get all subtype containers
+  const subtypeContainers = document.querySelectorAll('div[id$="-container"]');
 
-    // Hide all subtype containers
-    const subtypeContainers = document.querySelectorAll('div[id$="-container"]');
-    subtypeContainers.forEach(container => {
+  // Iterate over each subtype container
+  subtypeContainers.forEach(container => {
+    // Get the parent type from the container ID
+    const containerType = container.id.replace('-container', '');
+
+    // Get all checkboxes within the container
+    const checkboxes = container.querySelectorAll('input[type="checkbox"]');
+
+    if (containerType === selectedType) {
+      // If the container matches the selected type, show it and enable checkboxes
+      container.style.display = 'block';
+      checkboxes.forEach(checkbox => {
+        checkbox.disabled = false;
+        if (checkbox.dataset.hasOwnProperty('savedValue')) {
+          checkbox.checked = checkbox.dataset.savedValue === 'true';
+        }
+      });
+    } else {
+      // Otherwise, hide the container and disable checkboxes
       container.style.display = 'none';
-    });
-
-    // Show the selected subtype container
-    const selectedContainer = document.getElementById(selectedType + '-container');
-    if (selectedContainer) {
-      selectedContainer.style.display = 'block';
+      checkboxes.forEach(checkbox => {
+        checkbox.dataset.savedValue = checkbox.checked;
+        checkbox.disabled = true;
+        checkbox.checked = false;
+      });
     }
+  });
 
-    // Update the filter to reflect the change in visible subtypes
-    updateAlertFilter();
-  }
+  // Update the filter to reflect the change in visible subtypes
+  updateAlertFilter();
+}
 </script>
 </body>
 </html>
