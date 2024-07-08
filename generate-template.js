@@ -103,17 +103,27 @@ function getParentType(subtype) {
   return null; // Or handle cases where a parent type might not be found
 }
 
-function displayFiltersHTML() {
+function displayAlertTypes() {
+  // Get the first alert type by default
+  const defaultType = Alerts.display[Object.values(Alerts.types)[0]];
   return Object.entries(Alerts.types).map(([type, index]) => `
-    <div id="${Alerts.display[index]}-container" style="display:none;">
+    <option value="${Alerts.display[index]}" ${Alerts.display[index] === defaultType ? 'selected' : ''}>${Alerts.display[index]}</option>
+  `).join('')
+}
+
+function displayFiltersHTML() {
+  // Get the first alert type by default
+  const defaultType = Alerts.display[Object.values(Alerts.types)[0]];
+  return Object.entries(Alerts.types).map(([type, index]) => `
+    <div id="${Alerts.display[index]}-container" style="display: ${Alerts.display[index] === defaultType ? 'block' : 'none'}">
       <h3>${Alerts.display[index]}</h3>
       <span style="user-select: none;">
-        <input type="checkbox" id="${Alerts.display[index]}" name="alertType" value="${Alerts.display[index]}" checked onclick="updateAlertFilter()"> 
+        <input type="checkbox" id="${Alerts.display[index]}" name="alertType" value="${Alerts.display[index]}" onclick="updateAlertFilter()"> 
         <label for="${Alerts.display[index]}">${Alerts.display[index]} (All)</label><br> 
       </span>
       ${getChildrenIterable(index).map(subIndex => `
         <span style="user-select: none;">
-          <input type="checkbox" id="${Alerts.display[subIndex]}" name="alertType" value="${Alerts.display[subIndex]}" checked onclick="updateAlertFilter()">
+          <input type="checkbox" id="${Alerts.display[subIndex]}" name="alertType" value="${Alerts.display[subIndex]}" onclick="updateAlertFilter()">
           <label for="${Alerts.display[subIndex]}">${Alerts.display[subIndex]}</label><br>
         </span>
       `).join('')}
@@ -149,9 +159,7 @@ body { margin: 0; padding: 0; }
 <div id="controls">
   <h3>Select Alert Type</h3>
   <select id="alertTypeSelect" onchange="updateSubtypeVisibility()">
-    ${Object.entries(Alerts.types).map(([type, index]) => `
-      <option value="${Alerts.display[index]}">${Alerts.display[index]}</option>
-    `).join('')}
+    ${displayAlertTypes()}
   </select>
   <div id="subtype-filters">
     ${displayFiltersHTML()}
@@ -365,17 +373,13 @@ function updateSubtypeVisibility() {
       container.style.display = 'block';
       checkboxes.forEach(checkbox => {
         checkbox.disabled = false;
-        if (checkbox.dataset.hasOwnProperty('savedValue')) {
-          checkbox.checked = checkbox.dataset.savedValue === 'true';
-        }
       });
     } else {
       // Otherwise, hide the container and disable checkboxes
       container.style.display = 'none';
       checkboxes.forEach(checkbox => {
-        checkbox.dataset.savedValue = checkbox.checked;
         checkbox.disabled = true;
-        checkbox.checked = false;
+        checkbox.checked = false; // Uncheck the boxes when hidden
       });
     }
   });
@@ -383,6 +387,11 @@ function updateSubtypeVisibility() {
   // Update the filter to reflect the change in visible subtypes
   updateAlertFilter();
 }
+
+// Call updateSubtypeVisibility on page load to show the default type's checkboxes
+window.onload = function() {
+  updateSubtypeVisibility();
+};
 </script>
 </body>
 </html>
