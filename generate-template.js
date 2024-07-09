@@ -152,6 +152,14 @@ body { margin: 0; padding: 0; }
   padding: 1em;
   border-radius: 0.5em;
 }
+#configuration {
+  position: absolute;
+  top: 1em;
+  right: 1em;
+  background-color: rgba(255, 255, 255, 0.8);
+  padding: 1em;
+  border-radius: 0.5em;
+}
 </style>
 </head>
 <body>
@@ -164,6 +172,18 @@ body { margin: 0; padding: 0; }
   <div id="subtype-filters">
     ${displayFiltersHTML()}
   </div>
+</div>
+
+<div id="configuration">
+  <h3>Configure Map</h3>
+  <label for="clusterRadiusSlider">Cluster Radius: <span id="clusterRadiusValue">50</span></label><br>
+  <input id="clusterRadiusSlider" type="range" min="1" max="100" value="50" oninput="updateClusterRadius(this.value)"><br>
+
+  <label for="clusterMaxZoomSlider">Cluster Max Zoom: <span id="clusterMaxZoomValue">15</span></label><br>
+  <input id="clusterMaxZoomSlider" type="range" min="0" max="24" value="15" oninput="updateClusterMaxZoom(this.value)"><br>
+
+  <label for="clusterMinPointsSlider">Cluster Min Points: <span id="clusterMinPointsValue">20</span></label><br>
+  <input id="clusterMinPointsSlider" type="range" min="1" max="100" value="20" oninput="updateClusterMinPoints(this.value)"><br>
 </div>
 
 <script>
@@ -192,8 +212,20 @@ body { margin: 0; padding: 0; }
       updateAlertFilter(); 
     });
 
+  let clusterRadius = 50;
+  let clusterMaxZoom = 15;
+  let clusterMinPoints = 20;
+
   // Function to add the map source and layers
   function addMapLayers() {
+    // Remove the existing source and layers if they exist
+    if (map.getSource('alerts')) {
+      map.removeLayer('clusters');
+      map.removeLayer('cluster-count');
+      map.removeLayer('unclustered-point');
+      map.removeSource('alerts');
+    }
+
     // Add a clustered GeoJSON source
     map.addSource('alerts', {
       type: 'geojson',
@@ -202,9 +234,9 @@ body { margin: 0; padding: 0; }
         "features": [] // Initially empty, will be populated by filterAlertsByBounds
       },
       cluster: true, // Enable clustering
-      clusterMaxZoom: 15, // Max zoom to cluster points on
-      clusterMinPoints: 20, // Minimum points to cluster
-      clusterRadius: 40 // Radius of each cluster when clustering points (defaults to 50)
+      clusterMaxZoom: clusterMaxZoom, // Max zoom to cluster points on
+      clusterMinPoints: clusterMinPoints, // Minimum points to cluster
+      clusterRadius: clusterRadius // Radius of each cluster when clustering points (defaults to 50)
     });
 
     // Add a circle layer for clusters
@@ -392,6 +424,28 @@ function updateSubtypeVisibility() {
 window.onload = function() {
   updateSubtypeVisibility();
 };
+
+function updateClusterRadius(value) {
+  document.getElementById('clusterRadiusValue').textContent = value;
+  clusterRadius = parseInt(value);
+  addMapLayers(); // Re-add layers to apply changes
+  updateAlertFilter(); // Re-apply filters
+}
+
+function updateClusterMaxZoom(value) {
+  document.getElementById('clusterMaxZoomValue').textContent = value;
+  clusterMaxZoom = parseInt(value);
+  addMapLayers(); // Re-add layers to apply changes
+  updateAlertFilter(); // Re-apply filters
+}
+
+function updateClusterMinPoints(value) {
+  document.getElementById('clusterMinPointsValue').textContent = value;
+  clusterMinPoints = parseInt(value);
+  addMapLayers(); // Re-add layers to apply changes
+  updateAlertFilter(); // Re-apply filters
+}
+  
 </script>
 </body>
 </html>
