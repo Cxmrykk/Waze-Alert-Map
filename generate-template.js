@@ -144,6 +144,21 @@ const htmlContent = `
 <style>
 body { margin: 0; padding: 0; }
 #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+
+/* Overlay Styles */
+#loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000; /* Ensure overlay is on top */
+}
+
 #controls {
   position: absolute;
   top: 1em;
@@ -160,9 +175,19 @@ body { margin: 0; padding: 0; }
   padding: 1em;
   border-radius: 0.5em;
 }
+
+#loading-message {
+  font-size: 2em;
+  color: white;
+}
 </style>
 </head>
 <body>
+
+<div id="loading-overlay">
+  <div id="loading-message">Loading data...</div>
+</div>
+
 <div id="map"></div>
 <div id="controls">
   <h3>Select Alert Type</h3>
@@ -203,13 +228,24 @@ body { margin: 0; padding: 0; }
 
   // Fetch GeoJSON data and store it globally
   let alertData = null;
+  let sortedData = null;
 
-  fetch('./geojson.json')
-    .then(response => response.json())
+  Promise.all([
+    fetch('./geojson.json').then(response => response.json()),
+    fetch('./sorted.json').then(response => response.json())
+  ])
     .then(data => {
-      alertData = data;
+      alertData = data[0];
+      sortedData = data[1];
       addMapLayers();
       updateAlertFilter(); 
+
+      // Hide the overlay after data has loaded
+      document.getElementById('loading-overlay').style.display = 'none';
+    })
+    .catch(error => {
+      console.error('Error loading data:', error);
+      // Todo: handle error, maybe display an error message on the overlay
     });
 
   let clusterRadius = 50;
