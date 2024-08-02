@@ -1,7 +1,7 @@
 ### Setup
 ```sh
 # Clone the repository using git
-git clone https://github.com/Cxmrykk/Waze-Alert-Map
+git clone https://github.com/Cxmrykk/Waze-Alert-Map.git
 cd Waze-Alert-Map
 ```
 ```sh
