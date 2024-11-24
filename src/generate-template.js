@@ -1,10 +1,10 @@
-const Config = require("./helper/export-env")(
+const Config = require("../helper/export-env")(
   "DB_PATH",
   "ACCESS_TOKEN",
   "SOURCE_PATH"
 )
 
-const Alerts = require("./alert-types.json")
+const Alerts = require("../alert-types.json")
 const Database = require('better-sqlite3');
 const fs = require('fs');
 
@@ -287,8 +287,9 @@ body { margin: 0; padding: 0; }
           'interpolate',
           ['linear'],
           ['get', 'point_count'],
-          20, '#e6cc00',
-          100, '#c61a09'
+          0, '#e6cc00',
+          100, '#e65800',
+          1000, '#c61a09'
         ],
         'circle-radius': [
           'step',

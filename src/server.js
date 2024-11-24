@@ -1,4 +1,4 @@
-const Config = require("./helper/export-env")(
+const Config = require("../helper/export-env")(
     "DB_PATH",
     "MAX_ALERTS",
     "AREA_TOP",
@@ -9,7 +9,7 @@ const Config = require("./helper/export-env")(
     "QUERY_DELAY",
 )
 
-const Alerts = require("./alert-types.json")
+const Alerts = require("../alert-types.json")
 const Database = require('better-sqlite3')
 const axios = require("axios")
 
